@@ -32,25 +32,28 @@ app.post("/signup",async (req,res)=>{
 })
 
 app.post("/login",async(req,res)=>{
+    try{
+
         const {emailId,password} = req.body
         const user = await User.findOne({emailId:emailId})
         if(!user){
             return res.send("email id not currect")
         }
-        bcrypt.compare(password, user.password, async (err, result)=> {
-            if (err) {
-                return res.status(500).send("Error verifying password");
-            }
-            if (result) { 
-                const token = await jwt.sign({_id:user._id},"RAJ@sahu")
-                console.log("token", token,user._id)           
-                res.cookie("token",token)
-
-                return res.status(200).json({message:"User is correct"});
-            } else {
-                return res.status(400).send("Incorrect password");
-            }
-        });
+        isPasswordValidate = bcrypt.compare(password, user.password)
+        if(!isPasswordValidate){
+            throw new Error("the pass word is incorrect")
+        }
+        const token = user.getJWT()
+        console.log("token", token,user._id)           
+        res.cookie("token",token,{
+            sameSite:"strict",
+            maxAge:24*60*60*1000
+        })
+        return res.status(200).json({message:"User authenticated successfully"});
+    }
+    catch(error){
+        return res.status(500).json({message:"Error verifying password"})
+    }
 
     })
 
@@ -58,15 +61,6 @@ app.post("/login",async(req,res)=>{
 app.get("/getUser",userAuth,async(req,res)=>{
     
     try{
-        // const {token}= req.cookies
-        // if(!token){
-        //     res.send("use is not loged in")
-        // }
-        // const decoded = jwt.verify(token,"RAJ@sahu")
-        // let {_id}=decoded
-        // if(!_id){
-        //     res.status(404).send("user is not loged in")
-        // }
         const _id = req._id
         if(!_id){
             throw new Error("user is not found")
